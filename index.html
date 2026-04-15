@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Invisible Anchor | 從手稿到實作的隔震技術</title>
+
+  <style>
+
+    .logo-text {
+        letter-spacing: 0.4em;
+        margin-right: -0.4em;
+        text-transform: uppercase;
+        }
+
+        .site-nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 50;
+        padding: 40px 48px;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        background: transparent;
+        pointer-events: none;
+        }
+
+        .site-nav .logo-text {
+        font-size: clamp(1rem, 1.4vw, 1.5rem);
+        font-weight: 700;
+        color: white;
+        }
+
+        .site-footer {
+        position: relative;
+        z-index: 40;
+        padding: 64px 20px;
+        text-align: center;
+        background: black;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .site-footer p {
+        font-size: 10px;
+        letter-spacing: 0.5em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.3);
+        margin: 0;
+        }
+
+    :root {
+      --bg: #000000;
+      --bg-soft: #000000;
+      --paper: #000000;
+      --ink: #1e1f22;
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #f4f1eb;
+      --muted: rgba(244, 241, 235, 0.72);
+      --accent: #d8b26b;
+      --accent-soft: rgba(216, 178, 107, 0.18);
+      --accent-strong: rgba(216, 178, 107, 0.8);
+      --shadow: rgba(0, 0, 0, 0.45);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+      overflow-x: hidden;
+    }
+
+    body {
+      line-height: 1.6;
+      letter-spacing: 0.02em;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+    }
+
+    .story {
+      position: relative;
+      width: 100%;
+      background:
+        radial-gradient(circle at 50% 20%, rgba(255,255,255,0.04), transparent 40%),
+        linear-gradient(to bottom, #0c0f12 0%, #0a0c0f 100%);
+    }
+
+    .scroll-track {
+      position: relative;
+      height: 820vh;
+    }
+
+    .sticky-stage {
+      position: sticky;
+      top: 0;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at center, rgba(255,255,255,0.03), transparent 48%),
+        linear-gradient(to bottom, rgba(255,255,255,0.02), transparent 25%),
+        var(--bg);
+    }
+
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      opacity: 0.22;
+      background-image:
+        linear-gradient(to right, var(--line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+      background-size: 44px 44px;
+      pointer-events: none;
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.28) 100%);
+    }
+
+    .scene {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      will-change: transform, opacity, filter, clip-path;
+    }
+
+    .scene-center {
+      display: grid;
+      place-items: center;
+    }
+
+    /* 第一階段：直式手稿 */
+    .blueprint-scene {
+      display: grid;
+      place-items: center;
+      z-index: 3;
+    }
+
+    .blueprint-wrap {
+      position: relative;
+      width: min(58vw, 700px);
+      aspect-ratio: 10 / 14;
+      background: var(--paper);
+      overflow: hidden;
+      box-shadow:
+        0 30px 80px var(--shadow),
+        inset 0 0 0 1px rgba(0,0,0,0.06);
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+    }
+
+    .paper-texture {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 18% 20%, rgba(0,0,0,0.035), transparent 22%),
+        radial-gradient(circle at 70% 75%, rgba(0,0,0,0.03), transparent 28%),
+        linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(0,0,0,0.03));
+      mix-blend-mode: multiply;
+      opacity: 0.9;
+    }
+
+    .blueprint-img {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+
+    .blueprint-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center center;
+    }
+
+    .blueprint-frame {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      border: 1px solid rgba(0,0,0,0.08);
+      pointer-events: none;
+    }
+
+    .draft-lines {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      opacity: 0.22;
+      background:
+        linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mix-blend-mode: multiply;
+    }
+
+    /* 第二階段：右下焦點 reveal */
+    .core-reveal-wrap {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .foundation-glow {
+      position: absolute;
+      right: 10%;
+      bottom: 11%;
+      width: 28%;
+      height: 16%;
+      background: radial-gradient(circle, rgba(216,178,107,0.33), transparent 68%);
+      filter: blur(18px);
+      opacity: 0;
+    }
+
+    .focus-marker {
+      position: absolute;
+      right: 7.5%;
+      bottom: 7.5%;
+      width: 29%;
+      aspect-ratio: 1 / 1;
+      border: 1px solid var(--accent-strong);
+      box-shadow:
+        0 0 0 1px rgba(216,178,107,0.14),
+        0 0 30px rgba(216,178,107,0.1);
+      opacity: 0;
+      transform-origin: center center;
+    }
+
+    .focus-lines::before,
+    .focus-lines::after {
+      content: "";
+      position: absolute;
+      background: var(--accent-strong);
+      opacity: 0.9;
+    }
+
+    .focus-lines::before {
+      width: 72px;
+      height: 1px;
+      right: calc(7.5% + 29%);
+      bottom: calc(7.5% + 15%);
+    }
+
+    .focus-lines::after {
+      width: 1px;
+      height: 72px;
+      right: calc(7.5% + 8%);
+      bottom: calc(7.5% + 29%);
+    }
+
+    .isolator-window {
+      position: absolute;
+      right: 8%;
+      bottom: 8%;
+      width: 26%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      clip-path: inset(100% 0 0 0);
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow:
+        0 0 40px rgba(216,178,107,0.16),
+        inset 0 0 0 1px rgba(255,255,255,0.05);
+      background:
+        linear-gradient(to bottom, rgba(255,255,255,0.04), rgba(255,255,255,0.01)),
+        rgba(255,255,255,0.02);
+      backdrop-filter: blur(3px);
+    }
+
+    .isolator-detail-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 10% center;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    /* 第三階段：詳圖主畫面 */
+    .precision-scene {
+      display: grid;
+      place-items: center;
+      z-index: 6;
+      opacity: 0;
+      perspective: 1400px;
+      pointer-events: none;
+    }
+
+    .precision-backdrop {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 52% 48%, rgba(255,255,255,0.06), transparent 20%),
+        radial-gradient(circle at center, rgba(216,178,107,0.08), transparent 32%),
+        linear-gradient(to bottom, rgba(255,255,255,0.02), transparent 20%);
+      opacity: 0.8;
+    }
+
+    .isolator-hero {
+      position: relative;
+      width: min(42vw, 620px);
+      aspect-ratio: 1 / 1;
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+      filter: drop-shadow(0 40px 60px rgba(0,0,0,0.45));
+    }
+
+    .isolator-hero-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        will-change: transform, opacity, filter;
+        transform-style: preserve-3d;
+    }
+
+    .precision-ring {
+      position: absolute;
+      width: min(58vw, 820px);
+      aspect-ratio: 1 / 1;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 50%;
+      opacity: 0.3;
+    }
+
+    /* 第四階段：水平施作 */
+    .manifestation-scene {
+      z-index: 7;
+      opacity: 0;
+      pointer-events: none;
+      overflow: hidden;
+      background:
+        linear-gradient(to bottom, rgba(255,255,255,0.02), transparent),
+        var(--bg-soft);
+    }
+
+    .horizontal-strip {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 360vw;
+      display: flex;
+      will-change: transform;
+    }
+
+    .photo-frame {
+        position: relative;
+        width: 120vw;
+        height: 100%;
+        flex-shrink: 0;
+        background:
+            linear-gradient(to bottom, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+            #101318;
+        border-right: 1px solid rgba(255,255,255,0.08);
+        overflow: hidden;
+    }
+    .photo-box {
+        position: absolute;
+        inset: 12vh 10vw;
+        border: 1px dashed rgba(255,255,255,0.22);
+        overflow: hidden;
+        background: rgba(255,255,255,0.02);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+    }
+
+    .photo-real {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center center;
+    }
+
+    .photo-overlay {
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(to top, rgba(0,0,0,0.45), transparent 45%),
+            linear-gradient(to right, rgba(0,0,0,0.18), transparent 30%);
+        pointer-events: none;
+    }
+
+    .photo-caption {
+        position: absolute;
+        left: 6vw;
+        bottom: 8vh;
+        font-size: clamp(1rem, 1.4vw, 1.2rem);
+        color: rgba(255,255,255,0.85);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    /* 第五階段：結尾 */
+    .ending-scene {
+      z-index: 8;
+      opacity: 0;
+      pointer-events: none;
+      display: grid;
+      place-items: center;
+    }
+
+    .ending-building {
+      position: relative;
+      width: min(68vw, 1040px);
+      aspect-ratio: 16 / 9;
+      border: 1px solid rgba(255,255,255,0.08);
+      background:
+        linear-gradient(to bottom, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
+        radial-gradient(circle at center, rgba(216,178,107,0.06), transparent 40%),
+        #11151a;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+    }
+
+    .ending-building::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 8% 12%;
+      opacity: 0.25;
+    }
+
+    .ending-label {
+      position: absolute;
+      left: 4%;
+      top: 6%;
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.45);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .light-flow {
+      position: absolute;
+      left: -15%;
+      top: 38%;
+      width: 35%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      filter: blur(1px);
+      opacity: 0;
+    }
+
+    .light-flow.flow-2 {
+      top: 58%;
+      width: 42%;
+      transition: none;
+    }
+
+    /* 文案層 */
+    .copy-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 12;
+      pointer-events: none;
+    }
+
+    .copy-block {
+      position: absolute;
+      max-width: 520px;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .eyebrow {
+      display: block;
+      margin-bottom: 14px;
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.48);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .copy-block h2 {
+      font-size: clamp(1.8rem, 3.5vw, 3.6rem);
+      line-height: 1.04;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-bottom: 18px;
+    }
+
+    .copy-block p {
+      font-size: clamp(1rem, 1.2vw, 1.12rem);
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .copy-1 { left: 6vw; top: 28vh; }
+    .copy-2 { left: 6vw; top: 18vh; }
+    .copy-3 { left: 6vw; bottom: 14vh; }
+    .copy-4 { left: 6vw; top: 16vh; }
+    .copy-5 { right: 6vw; bottom: 12vh; text-align: right; }
+
+    .brand-mark {
+      position: absolute;
+      left: 4vw;
+      bottom: 3vh;
+      z-index: 14;
+      font-size: 0.84rem;
+      color: rgba(255,255,255,0.52);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .section-counter {
+      position: absolute;
+      right: 4vw;
+      top: 4vh;
+      z-index: 14;
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.42);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .xray-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 72% 82%, rgba(216,178,107,0.06), transparent 12%),
+        radial-gradient(circle at 75% 82%, rgba(255,255,255,0.12), transparent 9%);
+      opacity: 0;
+      mix-blend-mode: screen;
+    }
+
+    .ending-image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center center;
+    }
+
+    .ending-image-overlay {
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(to top, rgba(0,0,0,0.35), transparent 40%),
+            linear-gradient(to right, rgba(0,0,0,0.18), transparent 30%);
+        pointer-events: none;
+    }
+
+    .horizontal-strip,
+    .photo-frame,
+    .photo-box,
+    .photo-real {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    }
+
+    /* 響應式 */
+    @media (max-width: 1100px) {
+      .blueprint-wrap {
+        width: min(72vw, 680px);
+      }
+
+      .isolator-hero {
+        width: min(56vw, 560px);
+      }
+    }
+
+    @media (max-width: 900px) {
+      .scroll-track {
+        height: 760vh;
+      }
+
+      .blueprint-wrap {
+        width: 82vw;
+      }
+
+      .copy-block {
+        max-width: 78vw;
+      }
+
+      .copy-1,
+      .copy-2,
+      .copy-3,
+      .copy-4 {
+        left: 6vw;
+        right: auto;
+      }
+
+      .copy-5 {
+        left: 6vw;
+        right: auto;
+        text-align: left;
+      }
+
+      .isolator-window {
+        width: 31%;
+        right: 7%;
+        bottom: 8%;
+      }
+
+      .focus-marker {
+        width: 34%;
+        right: 5.5%;
+      }
+
+      .foundation-glow {
+        width: 34%;
+        right: 8%;
+      }
+
+      .isolator-hero {
+        width: 74vw;
+      }
+
+      .ending-building {
+        width: 84vw;
+      }
+    }
+
+    @media (max-width: 640px) {
+
+    .copy-1 {
+        left: 6vw;
+        top: 10vh;
+        right: auto;
+        bottom: auto;
+        max-width: 78vw;
+        z-index: 20;
+    }
+
+    .copy-1 h2 {
+        font-size: clamp(2rem, 8vw, 3.2rem);
+        line-height: 1.02;
+        margin-bottom: 12px;
+    }
+
+    .copy-1 p {
+        font-size: 0.95rem;
+        line-height: 1.5;
+        max-width: 72vw;
+    }
+
+    .grid-overlay {
+        background-size: 28px 28px;
+      }
+
+    .copy-block h2 {
+        font-size: clamp(1.8rem, 8vw, 3rem);
+    }
+
+    .copy-block p {
+        font-size: 0.98rem;
+    }
+
+    .blueprint-wrap {
+        width: 90vw;
+    }
+
+    .foundation-glow {
+        right: 7%;
+        bottom: 10%;
+        width: 38%;
+    }
+
+    .focus-marker {
+        right: 4%;
+        bottom: 7%;
+        width: 38%;
+    }
+
+    .isolator-window {
+        right: 5%;
+        bottom: 7.5%;
+        width: 34%;
+    }
+    }
+  </style>
+</head>
+<body>
+
+    <nav class="site-nav">
+        <span class="logo-text">GROUND MOVES / SYSTEM RUNS</span>
+    </nav>
+  <main class="story">
+    <section class="scroll-track">
+      <div class="sticky-stage">
+
+        <div class="grid-overlay"></div>
+        <div class="vignette"></div>
+
+        <!-- 第一、二階段：手稿與地基 reveal -->
+        <section class="scene blueprint-scene">
+          <div class="blueprint-wrap">
+            <div class="blueprint-img">
+              <!-- 你的手稿 -->
+              <img src="./images/sketch2.png" alt="建物手稿" />
+            </div>
+
+            <div class="paper-texture"></div>
+            <div class="draft-lines"></div>
+            <div class="blueprint-frame"></div>
+            <div class="xray-overlay"></div>
+
+            <div class="core-reveal-wrap">
+              <div class="foundation-glow"></div>
+              <div class="focus-marker"></div>
+              <div class="focus-lines"></div>
+
+              <div class="isolator-window">
+                <!-- 第二階段：隔震墊詳圖 -->
+                <img
+                  class="isolator-detail-img"
+                  src="./images/1.png"
+                  alt="隔震墊詳圖"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 第三階段：隔震墊精密展示 -->
+        <section class="scene scene-center precision-scene">
+            <div class="precision-backdrop"></div>
+            <div class="precision-ring"></div>
+
+            <div class="isolator-hero">
+                <img class="isolator-hero-img" src="./images/1.png" alt="isolator" />
+            </div>
+        </section>
+
+        <!-- 第四階段：實際施作 -->
+        <section class="scene manifestation-scene">
+            <div class="horizontal-strip">
+                <div class="photo-frame">
+                <div class="photo-box">
+                    <img class="photo-real" src="./images/4-1.png" alt="施工中場景1" />
+                    <div class="photo-overlay"></div>
+                </div>
+                </div>
+
+                <div class="photo-frame">
+                <div class="photo-box">
+                    <img class="photo-real" src="./images/4-2.png" alt="施工中場景2" />
+                    <div class="photo-overlay"></div>
+                </div>
+                </div>
+
+                <div class="photo-frame">
+                <div class="photo-box">
+                    <img class="photo-real" src="./images/4-3.png" alt="施工中場景3" />
+                    <div class="photo-overlay"></div>
+                </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第五階段：結尾 -->
+        <section class="scene ending-scene">
+        <div class="ending-building">
+            <img class="ending-image" src="./images/fin.jpg" alt="完工建築" />
+            <div class="ending-image-overlay"></div>
+            <div class="light-flow flow-1"></div>
+            <div class="light-flow flow-2"></div>
+        </div>
+        </section>
+
+        <div class="copy-layer"> 
+        <div class="copy-block copy-1">
+            <span class="eyebrow">Phase 01 / The Blueprint</span>
+            <h2>Absolute stability on unstable ground.</h2>
+            <p>It all begins with an architectural vision and a profound respect for the restless Earth.</p>
+        </div>
+
+        <div class="copy-block copy-2">
+            <span class="eyebrow">Phase 02 / The Core Location</span>
+            <h2>The pivot between change and eternity.</h2>
+            <p>Seismic isolation systems absorb uncertainty, ensuring uninterrupted operations.</p>
+        </div>
+
+        <div class="copy-block copy-3">
+            <span class="eyebrow">Phase 03 / The Precision</span>
+            <h2>The shock absorber of civilization.</h2>
+            <p>Every layer of precision engineering is designed to safeguard order amidst chaos.</p>
+        </div>
+
+        <div class="copy-block copy-4">
+            <span class="eyebrow">Phase 04 / The Manifestation</span>
+            <h2>Ground moves, system runs.</h2>
+            <p>From manuscript to reality, we etch a sense of security deep into the ground.</p>
+        </div>
+
+        <div class="copy-block copy-5">
+            <span class="eyebrow">Phase 05 / The Uninterrupted Flow</span>
+            <h2>Constant motion, unwavering protection.</h2>
+        </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+<footer class="site-footer">
+    <p>Fengyu × Milan Design Week 2026</p>
+</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+
+  <script>
+    gsap.registerPlugin(ScrollTrigger);
+
+    // 初始狀態
+    gsap.set(".copy-1", { opacity: 1, y: 0 });
+    gsap.set(".copy-2, .copy-3, .copy-4, .copy-5", { opacity: 0, y: 28 });
+
+    gsap.set(".blueprint-wrap", {
+      scale: 0.9,
+      rotationX: 2,
+      rotationY: -1.5,
+      transformOrigin: "center center"
+    });
+
+    gsap.set(".blueprint-img", {
+      scale: 1
+    });
+
+    gsap.set(".draft-lines", {
+      opacity: 0.12,
+      scale: 1,
+      transformOrigin: "center center"
+    });
+
+    gsap.set(".xray-overlay", {
+      opacity: 0
+    });
+
+    gsap.set(".foundation-glow", {
+      opacity: 0
+    });
+
+    gsap.set(".focus-marker", {
+      opacity: 0,
+      scale: 0.92
+    });
+
+    gsap.set(".focus-lines", {
+      opacity: 0
+    });
+
+    gsap.set(".isolator-window", {
+      clipPath: "inset(100% 0% 0% 0%)"
+    });
+
+    gsap.set(".isolator-detail-img", {
+      rotationY: -10,
+      rotationX: 8,
+      scale: 1.15,
+      z: 0,
+      transformOrigin: "center center"
+    });
+
+    gsap.set(".precision-scene", { opacity: 0 });
+    gsap.set(".isolator-hero", {
+      x: 260,
+      y: 180,
+      scale: 0.42,
+      rotationY: -18,
+      rotationX: 10,
+      opacity: 0,
+      transformOrigin: "center center"
+    });
+
+    gsap.set(".isolator-hero-img", {
+        scale: 1,
+        rotationZ: 0,
+        filter: "brightness(1)"
+    });
+
+    gsap.set(".manifestation-scene", { opacity: 0 });
+    gsap.set(".horizontal-strip", { x: "0vw" });
+
+    gsap.set(".ending-scene", { opacity: 0 });
+    gsap.set(".ending-building", { scale: 0.985, opacity: 0.9 });
+    gsap.set(".flow-1", { opacity: 0, xPercent: 0 });
+    gsap.set(".flow-2", { opacity: 0, xPercent: -10 });
+
+    const master = gsap.timeline({
+      scrollTrigger: {
+        trigger: ".scroll-track",
+        start: "top top",
+        end: "bottom bottom",
+        scrub: 1.2,
+        pin: ".sticky-stage",
+        anticipatePin: 1
+      }
+    });
+
+    // Phase 01 - Blueprint
+    master
+      .to(".blueprint-wrap", {
+        scale: 1.02,
+        duration: 1.05,
+        ease: "none"
+      }, 0)
+      .to(".blueprint-img", {
+        scale: 1.04,
+        duration: 1.05,
+        ease: "none"
+      }, 0)
+      .to(".draft-lines", {
+        scale: 1.15,
+        opacity: 0.24,
+        duration: 1.1,
+        ease: "none"
+      }, 0.08)
+      .to(".copy-1", {
+        opacity: 0,
+        y: -20,
+        duration: 0.32,
+        ease: "none"
+      }, 1.0)
+      .to(".copy-2", {
+        opacity: 1,
+        y: 0,
+        duration: 0.4,
+        ease: "none"
+      }, 1.14);
+
+    // Phase 02 - Core Location
+    master
+      .to(".xray-overlay", {
+        opacity: 1,
+        duration: 0.45,
+        ease: "none"
+      }, 1.18)
+      .to(".foundation-glow", {
+        opacity: 1,
+        duration: 0.45,
+        ease: "none"
+      }, 1.2)
+      .to(".focus-marker", {
+        opacity: 1,
+        scale: 1,
+        duration: 0.35,
+        ease: "none"
+      }, 1.22)
+      .to(".focus-lines", {
+        opacity: 1,
+        duration: 0.28,
+        ease: "none"
+      }, 1.25)
+      .to(".isolator-window", {
+        clipPath: "inset(0% 0% 0% 0%)",
+        duration: 0.78,
+        ease: "none"
+      }, 1.3)
+    .to(".isolator-detail-img", {
+        rotationY: 8,
+        rotationX: -3,
+        z: 18,
+        duration: 0.62,
+        ease: "none"
+    }, 1.38)
+    .to(".isolator-detail-img", {
+        rotationY: 0,
+        rotationX: 0,
+        z: 0,
+        duration: 0.62,
+        ease: "none"
+    }, 1.98)
+      .to(".focus-marker", {
+        opacity: 0.38,
+        duration: 0.3,
+        ease: "none"
+      }, 1.95);
+
+    // Transition to Phase 03
+    master
+      .to(".blueprint-scene", {
+        opacity: 0.15,
+        duration: 0.72,
+        ease: "none"
+      }, 2.35)
+      .to(".copy-2", {
+        opacity: 0,
+        y: -20,
+        duration: 0.3,
+        ease: "none"
+      }, 2.35)
+      .to(".precision-scene", {
+        opacity: 1,
+        duration: 0.42,
+        ease: "none"
+      }, 2.42)
+      .to(".isolator-hero", {
+        x: 0,
+        y: 0,
+        scale: 1,
+        rotationY: 0,
+        rotationX: 0,
+        opacity: 1,
+        duration: 1.05,
+        ease: "none"
+      }, 2.45)
+      .to(".copy-3", {
+        opacity: 1,
+        y: 0,
+        duration: 0.42,
+        ease: "none"
+      }, 2.72);
+
+    // Phase 03 - Precision
+    master
+    .to(".isolator-hero", {
+        scale: 1.08,
+        rotationY: 0,
+        rotationX: 0,
+        rotationZ: 0,
+        duration: 1.2,
+        ease: "none"
+    }, 3.2)
+    .to(".isolator-hero-img", {
+        scale: 1.08,
+        filter: "brightness(1.08)",
+        duration: 1.2,
+        ease: "none"
+    }, 3.2)
+    .to(".isolator-hero", {
+        scale: 1.16,
+        rotationY: 0,
+        rotationX: 0,
+        rotationZ: 0,
+        duration: 1.4,
+        ease: "none"
+    }, 4.35);
+
+    // Transition to Phase 04
+    master
+      .to(".copy-3", {
+        opacity: 0,
+        y: -20,
+        duration: 0.3,
+        ease: "none"
+      }, 5.2)
+      .to(".precision-scene", {
+        opacity: 0,
+        duration: 0.42,
+        ease: "none"
+      }, 5.25)
+      .to(".manifestation-scene", {
+        opacity: 1,
+        duration: 0.45,
+        ease: "none"
+      }, 5.25)
+      .to(".copy-4", {
+        opacity: 1,
+        y: 0,
+        duration: 0.42,
+        ease: "none"
+      }, 5.38)
+      .to(".horizontal-strip", {
+        x: "-240vw",
+        duration: 2.2,
+        ease: "none"
+        }, 5.52);
+
+     // Transition to Phase 05
+    master
+    .to(".copy-4", {
+        opacity: 0,
+        y: -20,
+        duration: 0.28,
+        ease: "none"
+    }, 7.82)
+
+    .to(".manifestation-scene", {
+        opacity: 0,
+        duration: 0.55,
+        ease: "none"
+    }, 7.9)
+
+    .to(".ending-scene", {
+        opacity: 1,
+        duration: 0.7,
+        ease: "none"
+    }, 8.0)
+
+    .to(".ending-building", {
+        scale: 1,
+        opacity: 1,
+        duration: 0.65,
+        ease: "none"
+    }, 8.08)
+
+    .to(".copy-5", {
+        opacity: 1,
+        y: 0,
+        duration: 0.42,
+        ease: "none"
+    }, 8.25)
+
+    .to(".flow-1", {
+        opacity: 1,
+        xPercent: 130,
+        duration: 0.65,
+        ease: "none"
+    }, 8.55)
+
+    .to(".flow-2", {
+        opacity: 0.82,
+        xPercent: 140,
+        duration: 0.75,
+        ease: "none"
+    }, 8.72);
+
+    // 滑鼠微互動：第二、三階段更有立體感
+    const stage = document.querySelector(".sticky-stage");
+    const hero = document.querySelector(".isolator-hero");
+    const detail = document.querySelector(".isolator-detail-img");
+
+    stage.addEventListener("mousemove", (e) => {
+    const nx = e.clientX / window.innerWidth - 0.5;
+    const ny = e.clientY / window.innerHeight - 0.5;
+
+    gsap.to(detail, {
+        rotationY: nx * 16,
+        rotationX: -ny * 12,
+        duration: 0.8,
+        overwrite: "auto"
+    });
+
+    gsap.to(hero, {
+        rotationY: gsap.getProperty(hero, "rotationY") + nx * 0.45,
+        rotationX: gsap.getProperty(hero, "rotationX") - ny * 0.35,
+        duration: 0.8,
+        overwrite: "auto"
+    });
+    });
+
+    // 視窗變化後刷新 ScrollTrigger
+    window.addEventListener("load", () => {
+      ScrollTrigger.refresh();
+    });
+    window.addEventListener("resize", () => {
+      ScrollTrigger.refresh();
+    });
+  </script>
+</body>
+</html>
